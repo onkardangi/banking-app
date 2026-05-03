@@ -1,0 +1,89 @@
+### Variables
+@baseUrl = http://localhost:8080/api
+@token = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJ0ZXN0QGV4YW1wbGUuY29tIiwiaWF0IjoxNzc3NzUxMzU1LCJleHAiOjE3Nzc4Mzc3NTV9.4Fvv6mVcn7rU4GMJk7Ipft5_JWZkZS6NFnxKuBBGbufxfEK5-yKyK-z_arkyPBOuqvp36234tJrqOqRPiHnTFw
+
+### ========================================
+### AUTHENTICATION (Get Token First)
+### ========================================
+
+### Register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123",
+  "firstName": "Test",
+  "lastName": "User",
+  "phone": "1234567890"
+}
+
+### Login (Copy token from response)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@example.com",
+  "password": "password123"
+}
+
+### ========================================
+### ACCOUNT ENDPOINTS
+### ========================================
+
+### Create Savings Account
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "accountType": "SAVINGS",
+  "initialDeposit": 1000.00
+}
+
+### Create Checking Account
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "accountType": "CHECKING",
+  "initialDeposit": 500.00
+}
+
+### Get All Accounts
+GET {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+
+### Get Account by ID (replace 1 with actual ID)
+GET {{baseUrl}}/accounts/1
+Authorization: Bearer {{token}}
+
+### Get Account by Number (replace with actual account number)
+GET {{baseUrl}}/accounts/number/1234340979139630
+Authorization: Bearer {{token}}
+
+### Update Account Status
+PATCH {{baseUrl}}/accounts/1/status?status=INACTIVE
+Authorization: Bearer {{token}}
+
+### Delete Account (only works with zero balance)
+DELETE {{baseUrl}}/accounts/2
+Authorization: Bearer {{token}}
+
+### ========================================
+### ERROR CASES (Should Fail)
+### ========================================
+
+### Try to access without token (Should return 401)
+GET {{baseUrl}}/accounts
+
+### Try to create 6th account (Should fail with limit exceeded)
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "accountType": "SAVINGS",
+  "initialDeposit": 0
+}

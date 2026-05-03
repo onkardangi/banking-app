@@ -125,4 +125,18 @@ public class AuthService {
 
         return UserResponse.fromUser(user);
     }
+
+    /**
+     * Get the currently authenticated user's ID
+     */
+    public Long getCurrentUserId(Authentication authentication) {
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        assert userDetails != null;
+        String email = userDetails.getUsername();
+
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"))
+                .getId();
+    }
+
 }

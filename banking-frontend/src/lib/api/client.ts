@@ -34,7 +34,7 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
+        if (error.response?.status === 401 || error.response?.status === 403) {
             // Clear auth and redirect to login
             localStorage.removeItem('auth-storage');
             if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
