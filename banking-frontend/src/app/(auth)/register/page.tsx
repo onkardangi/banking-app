@@ -16,7 +16,7 @@ import {toast} from 'sonner';
 import {Loader2} from 'lucide-react';
 
 const registerSchema = z.object({
-    email: z.email('Invalid email address'),
+    email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string(),
     firstName: z.string().min(1, 'First name is required'),
@@ -32,7 +32,6 @@ type RegisterFormData = z.infer<typeof registerSchema>;
 export default function RegisterPage() {
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-    const setAuth = useAuthStore((state) => state.setAuth);
 
     const {
         register,

@@ -1,8 +1,6 @@
 package com.banking.app.controller;
 
-import com.banking.app.dto.DepositRequest;
-import com.banking.app.dto.TransactionResponse;
-import com.banking.app.dto.WithdrawalRequest;
+import com.banking.app.dto.*;
 import com.banking.app.service.AuthService;
 import com.banking.app.service.TransactionService;
 import jakarta.validation.Valid;
@@ -94,5 +92,15 @@ public class TransactionController {
         Page<TransactionResponse> transactions = transactionService.getAllUserTransactions(userId, page, size);
 
         return ResponseEntity.ok(transactions);
+    }
+
+    @PostMapping("/transfer")
+    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request,
+                                                     Authentication authentication) {
+
+        Long userId = authService.getCurrentUserId(authentication);
+        TransferResponse response = transactionService.transfer(request, userId);
+        return new ResponseEntity<>(response, HttpStatus.CREATED);
+
     }
 }

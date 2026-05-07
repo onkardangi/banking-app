@@ -1,5 +1,16 @@
 import apiClient from './client';
-import { Transaction, DepositRequest, WithdrawalRequest } from '@/types/transaction';
+import { Transaction, DepositRequest, WithdrawalRequest, TransferRequest, TransferResponse } from '@/types/transaction';
+
+export interface PagedResponse<T> {
+    content: T[];
+    totalPages: number;
+    totalElements: number;
+    size: number;
+    number: number;
+    first: boolean;
+    last: boolean;
+    empty: boolean;
+}
 
 export const transactionsApi = {
     // Deposit money
@@ -50,4 +61,10 @@ export const transactionsApi = {
         );
         return response.data;
     },
+
+    // Transfer money between acccounts
+    transfer: async (transferRequest : TransferRequest): Promise<TransferResponse> => {
+        const response = await apiClient.post(`/transactions/transfer`, transferRequest);
+        return response.data;
+    }
 };

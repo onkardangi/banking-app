@@ -1,14 +1,9 @@
 package com.banking.app.service;
 
-import com.banking.app.dto.DepositRequest;
-import com.banking.app.dto.TransactionResponse;
-import com.banking.app.dto.WithdrawalRequest;
+import com.banking.app.dto.*;
 import com.banking.app.entity.Account;
 import com.banking.app.entity.Transaction;
-import com.banking.app.exception.AccountNotFoundException;
-import com.banking.app.exception.InsufficientFundsException;
-import com.banking.app.exception.TransactionNotFoundException;
-import com.banking.app.exception.UnauthorizedAccessException;
+import com.banking.app.exception.*;
 import com.banking.app.repository.AccountRepository;
 import com.banking.app.repository.TransactionRepository;
 import lombok.NoArgsConstructor;
@@ -21,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -51,7 +47,7 @@ public class TransactionService {
                 .orElseThrow(() -> new AccountNotFoundException("Account not found or access denied"));
 
         // 2. Validate account status
-        if(!account.isAccountActive()) {
+        if (!account.isAccountActive()) {
             throw new IllegalStateException("Cannot deposit to " + account.getStatus() + " account");
         }
 
@@ -62,14 +58,10 @@ public class TransactionService {
         account.setBalance(newBalance);
         Account updatedAccount = accountRepository.save(account);
 
-        Transaction transaction = Transaction.builder()
-                .accountId(account.getId())
-                .type(Transaction.TransactionType.DEPOSIT)
-                .amount(request.getAmount())
-                .description(request.getDescription())
-                .balanceAfter(newBalance)
-                .status(Transaction.TransactionStatus.COMPLETED)
-                .build();
+        Transaction transaction = Transaction.builder().accountId(account.getId())
+                .type(Transaction.TransactionType.DEPOSIT).amount(request.getAmount())
+                .description(request.getDescription()).balanceAfter(newBalance)
+                .status(Transaction.TransactionStatus.COMPLETED).build();
 
         Transaction savedTransaction = transactionRepository.save(transaction);
 
@@ -93,10 +85,7 @@ public class TransactionService {
 
         // 3. Check sufficient funds
         if (account.getBalance().compareTo(request.getAmount()) < 0) {
-            throw new InsufficientFundsException(
-                    String.format("Insufficient funds. Available: $%s, Requested: $%s",
-                            account.getBalance(), request.getAmount())
-            );
+            throw new InsufficientFundsException(String.format("Insufficient funds. Available: $%s, Requested: $%s", account.getBalance(), request.getAmount()));
         }
 
         // 4. Calculate new balance
@@ -107,14 +96,10 @@ public class TransactionService {
         Account updatedAccount = accountRepository.save(account);
 
         // 6. Create transaction record
-        Transaction transaction = Transaction.builder()
-                .accountId(account.getId())
-                .type(Transaction.TransactionType.WITHDRAWAL)
-                .amount(request.getAmount())
-                .description(request.getDescription())
-                .balanceAfter(newBalance)
-                .status(Transaction.TransactionStatus.COMPLETED)
-                .build();
+        Transaction transaction = Transaction.builder().accountId(account.getId())
+                .type(Transaction.TransactionType.WITHDRAWAL).amount(request.getAmount())
+                .description(request.getDescription()).balanceAfter(newBalance)
+                .status(Transaction.TransactionStatus.COMPLETED).build();
 
         Transaction savedTransaction = transactionRepository.save(transaction);
 
@@ -134,9 +119,7 @@ public class TransactionService {
         // Get all transactions
         List<Transaction> transactions = transactionRepository.findByAccountIdOrderByCreatedAtDesc(accountId);
 
-        return transactions.stream()
-                .map(TransactionResponse::fromTransaction)
-                .collect(Collectors.toList());
+        return transactions.stream().map(TransactionResponse::fromTransaction).collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
@@ -185,4 +168,83 @@ public class TransactionService {
         // Convert to response
         return transactionsPage.map(TransactionResponse::fromTransaction);
     }
+
+    @Transactional
+    public TransferResponse transfer(TransferRequest request, Long userId) {
+        log.info("Processing transfer of {} from account {} to account {}", request.getAmount(), request.getFromAccountId(), request.getToAccountId());
+
+        // 1. Validate that from and to accounts are different
+        if (request.getFromAccountId().equals(request.getToAccountId())) {
+            throw new SameAccountTransferException("Cannot transfer to the same account");
+        }
+
+        // 2. Get and validate source account (from account)
+        Account fromAccount = accountRepository.findByIdAndUserId(request.getFromAccountId(), userId)
+                .orElseThrow(() -> new AccountNotFoundException("Source account not found or access denied"));
+
+        // 3. Get and validate destination account (to account)
+        Account toAccount = accountRepository.findByIdAndUserId(request.getToAccountId(), userId)
+                .orElseThrow(() -> new AccountNotFoundException("Destination account not found or access denied"));
+
+        // 4. Validate both accounts are ACTIVE
+        if (!fromAccount.isAccountActive()) {
+            throw new IllegalStateException("Source account is not active");
+        }
+
+        if (!toAccount.isAccountActive()) {
+            throw new IllegalStateException("Destination account is not active");
+        }
+
+        // 5. Check sufficient funds in source account
+        if (fromAccount.getBalance().compareTo(request.getAmount()) < 0) {
+            throw new InsufficientFundsException(String.format("Insufficient funds. Available: $%s, Requested: $%s",
+                    fromAccount.getBalance(), request.getAmount()));
+        }
+
+        // 6. Calculate new balances
+        BigDecimal newFromBalance = fromAccount.getBalance().subtract(request.getAmount());
+        BigDecimal newToBalance = toAccount.getBalance().add(request.getAmount());
+
+        // 7. Update source account balance
+        fromAccount.setBalance(newFromBalance);
+        accountRepository.save(fromAccount);
+
+        // 8. Update destination account balance
+        toAccount.setBalance(newToBalance);
+        accountRepository.save(toAccount);
+
+        // 9. Create withdrawal transaction (source account)
+        String withdrawalDescription = request.getDescription() != null
+                ? request.getDescription() + " (Transfer to " + toAccount.getAccountType() + ")"
+                : "Transfer to " + toAccount.getAccountType();
+
+        Transaction withdrawal = Transaction.builder().account(fromAccount).accountId(fromAccount.getId())
+                .type(Transaction.TransactionType.TRANSFER).amount(request.getAmount())
+                .description(withdrawalDescription)
+                .balanceAfter(newFromBalance).status(Transaction.TransactionStatus.COMPLETED)
+                .createdAt(LocalDateTime.now()).build();
+
+        Transaction savedWithdrawal = transactionRepository.save(withdrawal);
+
+        // 10. Create deposit transaction (destination account)
+        String depositDescription = request.getDescription() != null
+                ? request.getDescription() + " (Transfer from " + fromAccount.getAccountType() + ")"
+                : "Transfer from " + fromAccount.getAccountType();
+
+        Transaction deposit = Transaction.builder()
+                .account(toAccount)
+                .type(Transaction.TransactionType.TRANSFER)
+                .amount(request.getAmount())
+                .description(depositDescription)
+                .balanceAfter(newToBalance)
+                .status(Transaction.TransactionStatus.COMPLETED)
+                .build();
+        Transaction savedDeposit = transactionRepository.save(deposit);
+
+        log.info("Transfer completed. From account new balance: {}, To account new balance: {}",
+                newFromBalance, newToBalance);
+
+        return TransferResponse.fromTransactions(withdrawal, deposit);
+    }
+
 }

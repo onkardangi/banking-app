@@ -32,3 +32,16 @@ export interface WithdrawalRequest {
     amount: number;
     description?: string;
 }
+
+export interface TransferRequest {
+    fromAccountId: number;
+    toAccountId: number;
+    amount: number;
+    description?: string;
+}
+
+export interface TransferResponse {
+    withdrawal: Transaction;
+    deposit: Transaction;
+    message: string;
+}
