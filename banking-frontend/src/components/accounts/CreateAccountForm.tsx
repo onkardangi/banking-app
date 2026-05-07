@@ -17,7 +17,7 @@ import { Loader2, CreditCard, TrendingUp } from 'lucide-react';
 
 const createAccountSchema = z.object({
     accountType: z.enum(['SAVINGS', 'CHECKING'], {
-        required_error: 'Please select an account type',
+        error: 'Please select an account type',
     }),
     initialDeposit: z.string().optional(),
 });
